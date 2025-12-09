@@ -1,9 +1,10 @@
-// src/app/(auth)/sign-up/page.tsx
+// app/(auth)/sign-in/page.tsx
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-type SignUpResponse =
+type SignInResponse =
   | {
       ok: true;
       message: string;
@@ -13,10 +14,9 @@ type SignUpResponse =
       errors: string[];
     };
 
-export default function SignUpPage() {
-  const [name, setName] = useState('');
+export default function SignInPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
@@ -29,34 +29,33 @@ export default function SignUpPage() {
     setSuccessMessage(null);
 
     try {
-      const response = await fetch('/api/auth/sign-up', {
+      const response = await fetch('/api/auth/sign-in', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name,
           email,
-          phone,
           password
         })
       });
 
-      const data = (await response.json()) as SignUpResponse;
+      const data = (await response.json()) as SignInResponse;
 
       if (!response.ok || !data.ok) {
-        const errors = !data.ok ? data.errors : ['Não foi possível criar a conta.'];
+        const errors = !data.ok ? data.errors : ['Não foi possível entrar.'];
         setErrorMessages(errors);
         return;
       }
 
       setSuccessMessage(data.message);
-      setName('');
-      setEmail('');
-      setPhone('');
-      setPassword('');
+
+      // TODO: quando houver dashboard/configuração de negócio, redirecionar para lá
+      setTimeout(() => {
+        router.push('/');
+      }, 800);
     } catch (error) {
-      console.error('Error submitting sign-up form:', error);
+      console.error('Error submitting sign-in form:', error);
       setErrorMessages(['Erro inesperado. Tente novamente mais tarde.']);
     } finally {
       setIsSubmitting(false);
@@ -67,10 +66,10 @@ export default function SignUpPage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
       <div className="w-full max-w-md rounded-xl bg-slate-900 p-8 shadow-xl shadow-slate-900/50">
         <h1 className="mb-2 text-center text-2xl font-semibold text-slate-50">
-          Criar conta
+          Entrar
         </h1>
         <p className="mb-6 text-center text-sm text-slate-400">
-          Crie sua conta para configurar o site institucional do seu negócio.
+          Acesse sua conta para continuar configurando o site do seu negócio.
         </p>
 
         {errorMessages.length > 0 && (
@@ -90,25 +89,6 @@ export default function SignUpPage() {
         )}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <label
-              htmlFor="name"
-              className="mb-1 block text-sm font-medium text-slate-200"
-            >
-              Nome completo
-            </label>
-            <input
-              id="name"
-              name="name"
-              className="block w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 outline-none ring-0 transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Seu nome"
-              autoComplete="name"
-              required
-            />
-          </div>
-
           <div>
             <label
               htmlFor="email"
@@ -131,24 +111,6 @@ export default function SignUpPage() {
 
           <div>
             <label
-              htmlFor="phone"
-              className="mb-1 block text-sm font-medium text-slate-200"
-            >
-              Telefone (opcional)
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              className="block w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 outline-none ring-0 transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder="(11) 99999-9999"
-              autoComplete="tel"
-            />
-          </div>
-
-          <div>
-            <label
               htmlFor="password"
               className="mb-1 block text-sm font-medium text-slate-200"
             >
@@ -161,10 +123,9 @@ export default function SignUpPage() {
               className="block w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 outline-none ring-0 transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Mínimo de 8 caracteres"
-              autoComplete="new-password"
+              placeholder="Sua senha"
+              autoComplete="current-password"
               required
-              minLength={8}
             />
           </div>
 
@@ -173,12 +134,18 @@ export default function SignUpPage() {
             disabled={isSubmitting}
             className="flex w-full items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {isSubmitting ? 'Criando conta...' : 'Criar conta'}
+            {isSubmitting ? 'Entrando...' : 'Entrar'}
           </button>
 
           <p className="pt-1 text-center text-xs text-slate-500">
-            Ao continuar, você concorda em receber um e-mail para confirmar sua
-            conta antes de acessar o painel.
+            Ainda não tem conta?{' '}
+            <button
+              type="button"
+              className="text-emerald-400 underline-offset-2 hover:underline"
+              onClick={() => router.push('/sign-up')}
+            >
+              Criar conta
+            </button>
           </p>
         </form>
       </div>
