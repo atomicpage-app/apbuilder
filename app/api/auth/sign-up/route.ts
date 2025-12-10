@@ -11,12 +11,6 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   );
 }
 
-if (!APP_URL) {
-  throw new Error(
-    "APP_URL não configurado. Defina NEXT_PUBLIC_APP_URL com a URL pública da aplicação (ex.: http://localhost:3000)."
-  );
-}
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 type SignUpBody = {
@@ -55,16 +49,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const appUrl = APP_URL || request.nextUrl.origin;
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { name },
-      emailRedirectTo: `${APP_URL}/sign-in?confirmed=1`,
+      emailRedirectTo: `${appUrl}/sign-in?confirmed=1`,
     },
   });
 
   if (error) {
+    console.error("[SIGN-UP ERROR]", error);
     return NextResponse.json(
       {
         error:
