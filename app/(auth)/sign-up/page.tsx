@@ -19,7 +19,10 @@ export default function SignUpPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const formData = new FormData(event.currentTarget);
+    // IMPORTANTE: capturar o form ANTES do await para evitar erro no SyntheticEvent
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
     const name = String(formData.get("name") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
@@ -44,11 +47,16 @@ export default function SignUpPage() {
         body: JSON.stringify({ name, email, password }),
       });
 
-      const data = await response.json().catch(() => null);
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
 
       if (!response.ok) {
         const message =
-          (data && typeof (data as any).error === "string" && (data as any).error) ||
+          (data && typeof data.error === "string" && data.error) ||
           "Não foi possível criar sua conta. Tente novamente.";
         setState({
           isLoading: false,
@@ -64,8 +72,11 @@ export default function SignUpPage() {
         success:
           "Conta criada com sucesso. Verifique seu e-mail para confirmar o cadastro.",
       });
-      event.currentTarget.reset();
+
+      // Agora usamos a referência salva do form, não o event.currentTarget pós-await
+      form.reset();
     } catch (error) {
+      console.error("[SIGN-UP HANDLE SUBMIT ERROR]", error);
       setState({
         isLoading: false,
         error: "Ocorreu um erro inesperado. Tente novamente.",
