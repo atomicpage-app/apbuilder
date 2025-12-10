@@ -1,98 +1,110 @@
-// app/(auth)/sign-in/page.tsx
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { FormEvent, useState } from "react";
+import Link from "next/link";
 
-type SignInResponse =
-  | {
-      ok: true;
-      message: string;
-    }
-  | {
-      ok: false;
-      errors: string[];
-    };
+type SignUpFormState = {
+  isLoading: boolean;
+  error: string | null;
+  success: string | null;
+};
 
-export default function SignInPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessages, setErrorMessages] = useState<string[]>([]);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+export default function SignUpPage() {
+  const [state, setState] = useState<SignUpFormState>({
+    isLoading: false,
+    error: null,
+    success: null,
+  });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
-    setErrorMessages([]);
-    setSuccessMessage(null);
+
+    const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("name") ?? "").trim();
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    if (!name || !email || !password) {
+      setState({
+        isLoading: false,
+        error: "Preencha todos os campos.",
+        success: null,
+      });
+      return;
+    }
+
+    setState({ isLoading: true, error: null, success: null });
 
     try {
-      const response = await fetch('/api/auth/sign-in', {
-        method: 'POST',
+      const response = await fetch("/api/auth/sign-up", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          email,
-          password
-        })
+        body: JSON.stringify({ name, email, password }),
       });
 
-      const data = (await response.json()) as SignInResponse;
+      const data = await response.json().catch(() => null);
 
-      if (!response.ok || !data.ok) {
-        const errors = !data.ok ? data.errors : ['Não foi possível entrar.'];
-        setErrorMessages(errors);
+      if (!response.ok) {
+        const message =
+          (data && typeof (data as any).error === "string" && (data as any).error) ||
+          "Não foi possível criar sua conta. Tente novamente.";
+        setState({
+          isLoading: false,
+          error: message,
+          success: null,
+        });
         return;
       }
 
-      setSuccessMessage(data.message);
-
-      // TODO: quando houver dashboard/configuração de negócio, redirecionar para lá
-      setTimeout(() => {
-        router.push('/');
-      }, 800);
+      setState({
+        isLoading: false,
+        error: null,
+        success:
+          "Conta criada com sucesso. Verifique seu e-mail para confirmar o cadastro.",
+      });
+      event.currentTarget.reset();
     } catch (error) {
-      console.error('Error submitting sign-in form:', error);
-      setErrorMessages(['Erro inesperado. Tente novamente mais tarde.']);
-    } finally {
-      setIsSubmitting(false);
+      setState({
+        isLoading: false,
+        error: "Ocorreu um erro inesperado. Tente novamente.",
+        success: null,
+      });
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
-      <div className="w-full max-w-md rounded-xl bg-slate-900 p-8 shadow-xl shadow-slate-900/50">
-        <h1 className="mb-2 text-center text-2xl font-semibold text-slate-50">
-          Entrar
-        </h1>
-        <p className="mb-6 text-center text-sm text-slate-400">
-          Acesse sua conta para continuar configurando o site do seu negócio.
-        </p>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+        <header className="mb-6 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Criar conta</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Crie sua conta para começar a usar a aplicação.
+          </p>
+        </header>
 
-        {errorMessages.length > 0 && (
-          <div className="mb-4 rounded-lg border border-red-500/60 bg-red-500/10 p-3 text-sm text-red-200">
-            <ul className="list-disc space-y-1 pl-4">
-              {errorMessages.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-slate-700"
+            >
+              Nome
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              autoComplete="name"
+              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
+            />
           </div>
-        )}
 
-        {successMessage && (
-          <div className="mb-4 rounded-lg border border-emerald-500/60 bg-emerald-500/10 p-3 text-sm text-emerald-200">
-            {successMessage}
-          </div>
-        )}
-
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div>
+          <div className="space-y-1.5">
             <label
               htmlFor="email"
-              className="mb-1 block text-sm font-medium text-slate-200"
+              className="block text-sm font-medium text-slate-700"
             >
               E-mail
             </label>
@@ -100,19 +112,15 @@ export default function SignInPage() {
               id="email"
               name="email"
               type="email"
-              className="block w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 outline-none ring-0 transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="voce@exemplo.com"
               autoComplete="email"
-              required
+              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
             />
           </div>
 
-          <div>
+          <div className="space-y-1.5">
             <label
               htmlFor="password"
-              className="mb-1 block text-sm font-medium text-slate-200"
+              className="block text-sm font-medium text-slate-700"
             >
               Senha
             </label>
@@ -120,35 +128,37 @@ export default function SignInPage() {
               id="password"
               name="password"
               type="password"
-              className="block w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 outline-none ring-0 transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Sua senha"
-              autoComplete="current-password"
-              required
+              autoComplete="new-password"
+              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
             />
           </div>
 
+          {state.error && (
+            <p className="text-sm text-red-500">{state.error}</p>
+          )}
+          {state.success && (
+            <p className="text-sm text-green-600">{state.success}</p>
+          )}
+
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="flex w-full items-center justify-center rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
+            disabled={state.isLoading}
+            className="mt-2 inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-80"
           >
-            {isSubmitting ? 'Entrando...' : 'Entrar'}
+            {state.isLoading ? "Criando conta..." : "Criar conta"}
           </button>
-
-          <p className="pt-1 text-center text-xs text-slate-500">
-            Ainda não tem conta?{' '}
-            <button
-              type="button"
-              className="text-emerald-400 underline-offset-2 hover:underline"
-              onClick={() => router.push('/sign-up')}
-            >
-              Criar conta
-            </button>
-          </p>
         </form>
+
+        <p className="mt-6 text-center text-sm text-slate-500">
+          Já tem uma conta?{" "}
+          <Link
+            href="/sign-in"
+            className="font-medium text-slate-900 underline-offset-4 hover:underline"
+          >
+            Entrar
+          </Link>
+        </p>
       </div>
-    </main>
+    </div>
   );
 }
