@@ -75,11 +75,13 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
       <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <header className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Criar conta</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+            Criar conta
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
             Crie sua conta para começar a usar a aplicação.
           </p>
         </header>
@@ -88,7 +90,7 @@ export default function SignUpPage() {
           <div className="space-y-1.5">
             <label
               htmlFor="name"
-              className="block text-sm font-medium text-slate-700"
+              className="block text-sm font-medium text-slate-800"
             >
               Nome
             </label>
@@ -97,14 +99,15 @@ export default function SignUpPage() {
               name="name"
               type="text"
               autoComplete="name"
-              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
+              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
+              placeholder="Seu nome completo"
             />
           </div>
 
           <div className="space-y-1.5">
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-slate-700"
+              className="block text-sm font-medium text-slate-800"
             >
               E-mail
             </label>
@@ -113,14 +116,15 @@ export default function SignUpPage() {
               name="email"
               type="email"
               autoComplete="email"
-              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
+              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
+              placeholder="seuemail@exemplo.com"
             />
           </div>
 
           <div className="space-y-1.5">
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-slate-700"
+              className="block text-sm font-medium text-slate-800"
             >
               Senha
             </label>
@@ -129,7 +133,8 @@ export default function SignUpPage() {
               name="password"
               type="password"
               autoComplete="new-password"
-              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
+              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
+              placeholder="Crie uma senha"
             />
           </div>
 
@@ -149,7 +154,7 @@ export default function SignUpPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-slate-600">
           Já tem uma conta?{" "}
           <Link
             href="/sign-in"

@@ -3,10 +3,17 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error(
     "Supabase não configurado corretamente. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+  );
+}
+
+if (!APP_URL) {
+  throw new Error(
+    "APP_URL não configurado. Defina NEXT_PUBLIC_APP_URL com a URL pública da aplicação (ex.: http://localhost:3000)."
   );
 }
 
@@ -38,6 +45,9 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.auth.resend({
       type: "signup",
       email,
+      options: {
+        emailRedirectTo: `${APP_URL}/sign-in?confirmed=1`,
+      },
     });
 
     if (error) {

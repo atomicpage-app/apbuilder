@@ -3,12 +3,17 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  // Falha de configuração em tempo de build/boot
-  // Preferível falhar cedo do que mascarar erro de infra
   throw new Error(
     "Supabase não configurado corretamente. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+  );
+}
+
+if (!APP_URL) {
+  throw new Error(
+    "APP_URL não configurado. Defina NEXT_PUBLIC_APP_URL com a URL pública da aplicação (ex.: http://localhost:3000)."
   );
 }
 
@@ -55,13 +60,11 @@ export async function POST(request: NextRequest) {
     password,
     options: {
       data: { name },
-      // Se quiser redirecionar para uma rota específica ao confirmar:
-      // emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      emailRedirectTo: `${APP_URL}/sign-in?confirmed=1`,
     },
   });
 
   if (error) {
-    // Mensagens comuns do Supabase: "User already registered", etc.
     return NextResponse.json(
       {
         error:
@@ -72,7 +75,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Não retornamos tokens/sessões aqui. Foco no fluxo de confirmação.
   return NextResponse.json(
     {
       message:
