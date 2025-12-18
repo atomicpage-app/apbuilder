@@ -1,45 +1,31 @@
-// lib/supabase/server.ts
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
-import type { User } from '@supabase/supabase-js';
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SUPABASE_URL_ENV = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY_ENV = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!SUPABASE_URL) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
+if (!SUPABASE_URL_ENV || !SUPABASE_ANON_KEY_ENV) {
+  throw new Error(
+    "Supabase não configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+  );
 }
 
-if (!SUPABASE_ANON_KEY) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable');
-}
+const SUPABASE_URL: string = SUPABASE_URL_ENV;
+const SUPABASE_ANON_KEY: string = SUPABASE_ANON_KEY_ENV;
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
 
   return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll();
       },
-      set(name: string, value: string, options: any) {
-        cookieStore.set(name, value, options);
+      setAll(cookiesToSet) {
+        for (const cookie of cookiesToSet) {
+          cookieStore.set(cookie);
+        }
       },
-      remove(name: string, options: any) {
-        cookieStore.set(name, '', { ...options, maxAge: 0 });
-      }
-    }
+    },
   });
-}
-
-export async function getCurrentUser(): Promise<User | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-
-  if (error) {
-    console.error('Error getting current user:', error);
-    return null;
-  }
-
-  return data.user ?? null;
 }
