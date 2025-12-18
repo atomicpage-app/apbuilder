@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { sanitizeNext } from "@/lib/supabase/auth/sanitize-next";
 
 type SignInFormState = {
   isLoading: boolean;
@@ -23,18 +24,19 @@ type LogoutState = {
   error: string | null;
 };
 
-function normalizeNext(nextParam: string | null) {
+function sanitizeNextNullable(nextParam: string | null) {
   if (!nextParam) return null;
-  if (!nextParam.startsWith("/")) return null;
-  if (nextParam.startsWith("//")) return null;
-  return nextParam;
+  const sanitized = sanitizeNext(nextParam, "/app");
+  // Se sanitizou e devolveu fallback, tratamos como "não fornecido" para UI.
+  if (sanitized === "/app" && nextParam !== "/app") return null;
+  return sanitized;
 }
 
 export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const confirmedFromEmail = searchParams.get("confirmed") === "1";
-  const nextParam = normalizeNext(searchParams.get("next"));
+  const nextParam = sanitizeNextNullable(searchParams.get("next"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -126,7 +128,6 @@ export default function SignInPage() {
         isAuthenticated: true,
       }));
 
-      // MVP: sempre navegar para área protegida; se existir `next`, respeita.
       const destination = nextParam || "/app";
       router.push(destination);
       router.refresh();
