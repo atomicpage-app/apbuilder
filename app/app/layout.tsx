@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   const { data } = await supabase.auth.getUser();
 
   if (!data.user) {
-    redirect("/sign-in?next=/app");
+    redirect("/sign-in");
   }
 
   return <>{children}</>;
