@@ -14,11 +14,6 @@ if (!SUPABASE_ANON_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable");
 }
 
-/**
- * Server Components / SSR (read-only cookies).
- * Next 16.1+ forbids modifying cookies during Server Component render.
- * Cookies must be written only in Route Handlers / Server Actions.
- */
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
 
@@ -27,12 +22,9 @@ export async function createSupabaseServerClient() {
       get(name: string) {
         return cookieStore.get(name)?.value;
       },
-      set() {
-        // no-op: cannot set cookies during Server Component render
-      },
-      remove() {
-        // no-op: cannot remove cookies during Server Component render
-      },
+      // IMPORTANTE: Server Components não podem modificar cookies no Next 16.1+
+      set() {},
+      remove() {},
     },
   });
 }
