@@ -1,92 +1,47 @@
+// app/api/auth/sign-in/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-type SignInBody = {
-  email?: string;
-  password?: string;
-};
-
-function isNeedsEmailConfirmation(message: string) {
-  const m = message.toLowerCase();
-  return (
-    m.includes("confirm") ||
-    m.includes("verify") ||
-    m.includes("not confirmed") ||
-    m.includes("email not confirmed")
-  );
+function badRequest(message: string) {
+  return NextResponse.json({ error: "bad_request", message }, { status: 400 });
 }
 
-export async function POST(request: NextRequest) {
-  let body: SignInBody;
+function internalError(message = "Erro interno") {
+  return NextResponse.json({ error: "internal_error", message }, { status: 500 });
+}
 
+export async function POST(req: NextRequest) {
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { error: "Payload inválido. Envie um JSON com email e password." },
-      { status: 400 }
-    );
+    const supabase = await createSupabaseServerClient();
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return badRequest("Payload inválido.");
+    }
+
+    const { email, password } = body as {
+      email?: string;
+      password?: string;
+    };
+
+    if (!email || !password) {
+      return badRequest("Email e senha são obrigatórios.");
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return badRequest("Credenciais inválidas.");
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Erro no sign-in:", err);
+    return internalError();
   }
-
-  const email = String(body.email ?? "").trim().toLowerCase();
-  const password = String(body.password ?? "");
-
-  if (!email || !password) {
-    return NextResponse.json({ error: "Informe e-mail e senha." }, { status: 400 });
-  }
-
-  // IMPORTANTE: o response que será retornado é o mesmo usado no adapter de cookies
-  const response = NextResponse.json({ ok: true }, { status: 200 });
-
-  const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: any) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: any) {
-        response.cookies.set({ name, value: "", ...options, maxAge: 0 });
-      },
-    },
-  });
-
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (!error && data.session && data.user) {
-    // Recria o JSON final no mesmo response, preservando Set-Cookie já anexado
-    response.headers.set("content-type", "application/json; charset=utf-8");
-    return NextResponse.json(
-      {
-        message: "Login realizado com sucesso.",
-        userId: data.user.id,
-        needsEmailConfirmation: false,
-      },
-      { status: 200, headers: response.headers }
-    );
-  }
-
-  const message =
-    error?.message ||
-    "Não foi possível entrar. Verifique seus dados e tente novamente.";
-
-  if (isNeedsEmailConfirmation(message)) {
-    return NextResponse.json(
-      {
-        error:
-          "Sua conta ainda não foi confirmada. Verifique seu e-mail ou solicite o reenvio.",
-        needsEmailConfirmation: true,
-      },
-      { status: 401, headers: response.headers }
-    );
-  }
-
-  return NextResponse.json(
-    { error: message, needsEmailConfirmation: false },
-    { status: 401, headers: response.headers }
-  );
 }

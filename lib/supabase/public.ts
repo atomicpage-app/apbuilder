@@ -1,7 +1,5 @@
-// lib/supabase/server.ts
-import { cookies } from "next/headers";
+// lib/supabase/public.ts
 import { createServerClient } from "@supabase/ssr";
-import type { User } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -15,25 +13,14 @@ if (!SUPABASE_ANON_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable");
 }
 
-export async function createSupabaseServerClient() {
-  const cookieStore = await cookies();
-
+export function createSupabasePublicClient() {
   return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      get() {
+        return undefined;
       },
-      // Server Components não podem alterar cookies
       set() {},
       remove() {},
     },
   });
-}
-
-export async function getCurrentUser(): Promise<User | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-
-  if (error) return null;
-  return data.user ?? null;
 }
