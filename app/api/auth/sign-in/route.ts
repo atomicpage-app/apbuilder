@@ -1,64 +1,40 @@
-// app/api/auth/sign-in/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-<<<<<<< HEAD
-function badRequest(message: string) {
-  return NextResponse.json({ error: "bad_request", message }, { status: 400 });
-}
-
-function internalError(message = "Erro interno") {
-  return NextResponse.json({ error: "internal_error", message }, { status: 500 });
-}
-=======
-type SignInBody = {
-  email?: string;
-  password?: string;
-};
+import { createServerClient } from "@supabase/ssr";
+import type { Database } from "@/lib/supabase/database.types";
 
 export async function POST(request: NextRequest) {
-  let body: SignInBody;
->>>>>>> origin/chore/auth-sanitize-next
+  const response = NextResponse.json({}, { status: 200 });
 
-export async function POST(req: NextRequest) {
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
+  let body: { email?: string; password?: string };
+
   try {
-    const supabase = await createSupabaseServerClient();
-
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return badRequest("Payload inválido.");
-    }
-
-    const { email, password } = body as {
-      email?: string;
-      password?: string;
-    };
-
-    if (!email || !password) {
-      return badRequest("Email e senha são obrigatórios.");
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      return badRequest("Credenciais inválidas.");
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("Erro no sign-in:", err);
-    return internalError();
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Payload inválido." },
+      { status: 400 }
+    );
   }
-<<<<<<< HEAD
-=======
 
-  const email = String(body.email ?? "").trim().toLowerCase();
-  const password = String(body.password ?? "");
+  const email = body.email?.trim();
+  const password = body.password;
 
   if (!email || !password) {
     return NextResponse.json(
@@ -67,50 +43,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const supabase = await createSupabaseServerClient();
-
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
-  if (!error && data.session && data.user) {
-    // IMPORTANTE: aqui o @supabase/ssr deve setar cookies automaticamente via cookieStore.setAll()
+  if (error) {
     return NextResponse.json(
-      {
-        message: "Login realizado com sucesso.",
-        userId: data.user.id,
-        needsEmailConfirmation: false,
-      },
-      { status: 200 }
-    );
-  }
-
-  const message =
-    error?.message ||
-    "Não foi possível entrar. Verifique seus dados e tente novamente.";
-
-  const lowerMessage = message.toLowerCase();
-  const needsEmailConfirmation =
-    lowerMessage.includes("confirm") || lowerMessage.includes("verify");
-
-  if (needsEmailConfirmation) {
-    return NextResponse.json(
-      {
-        error:
-          "Sua conta ainda não foi confirmada. Verifique seu e-mail ou solicite o reenvio.",
-        needsEmailConfirmation: true,
-      },
+      { error: error.message },
       { status: 401 }
     );
   }
 
-  return NextResponse.json(
-    {
-      error: message,
-      needsEmailConfirmation: false,
-    },
-    { status: 401 }
-  );
->>>>>>> origin/chore/auth-sanitize-next
+  return response;
 }

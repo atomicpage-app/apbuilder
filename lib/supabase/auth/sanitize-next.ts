@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // lib/supabase/auth/sanitize-next.ts
 
 /**
@@ -24,7 +23,9 @@ export function sanitizeNext(
 
   // Não aceita URL absoluta
   const lower = cleaned.toLowerCase();
-  if (lower.startsWith("http://") || lower.startsWith("https://")) return fallback;
+  if (lower.startsWith("http://") || lower.startsWith("https://")) {
+    return fallback;
+  }
 
   // Não aceita protocol-relative
   if (cleaned.startsWith("//")) return fallback;
@@ -38,26 +39,8 @@ export function sanitizeNext(
   // Bloqueia backslash (Windows path quirks)
   if (cleaned.includes("\\")) return fallback;
 
-  // Opcional: limitar tamanho para evitar abuso
+  // Limite defensivo de tamanho
   if (cleaned.length > 2048) return fallback;
 
   return cleaned;
-=======
-export function sanitizeNext(input: string | null | undefined, fallback = "/app") {
-  if (!input) return fallback;
-
-  // remove espaços e normaliza
-  const value = String(input).trim();
-
-  // precisa começar com "/" e não pode começar com "//"
-  if (!value.startsWith("/") || value.startsWith("//")) return fallback;
-
-  // bloqueia tentativas óbvias de URL absoluta embutida
-  if (value.includes("://")) return fallback;
-
-  // opcional: limitar tamanho para evitar abuso
-  if (value.length > 2048) return fallback;
-
-  return value;
->>>>>>> origin/chore/auth-sanitize-next
 }
