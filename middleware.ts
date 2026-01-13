@@ -21,12 +21,12 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const pathname = req.nextUrl.pathname;
+  // Apenas garante que a sessão SSR esteja sincronizada
+  await supabase.auth.getUser();
 
   return res;
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/sign-in"],
+  matcher: ["/app/:path*"],
 };
