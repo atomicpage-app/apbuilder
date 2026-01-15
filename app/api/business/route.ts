@@ -30,11 +30,12 @@ function badRequest(message: string) {
   return json(400, { error: "bad_request", message });
 }
 
-function unauthorized() {
-  return json(401, {
-    error: "unauthorized",
-    message: "Usuário não autenticado.",
-  });
+function unauthorized(message = "Usuário não autenticado.") {
+  return json(401, { error: "unauthorized", message });
+}
+
+function forbidden(message: string) {
+  return json(403, { error: "forbidden", message });
 }
 
 function conflict(message: string) {
@@ -105,18 +106,18 @@ function validatePayload(body: unknown): CreateBusinessPayload | null {
   };
 }
 
-async function getTenantIdForUser(
+async function getAccountForUser(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   userId: string
 ) {
   const { data, error } = await supabase
     .from("accounts")
-    .select("tenant_id")
+    .select("tenant_id, status")
     .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw error;
-  return data?.tenant_id ?? null;
+  return data ?? null;
 }
 
 export async function POST(req: NextRequest) {
@@ -128,12 +129,23 @@ export async function POST(req: NextRequest) {
       error: userError,
     } = await supabase.auth.getUser();
 
-    if (userError || !user) return unauthorized();
-
-    const tenantId = await getTenantIdForUser(supabase, user.id);
-    if (!tenantId) {
-      return badRequest("Conta do usuário não possui tenant_id.");
+    if (userError || !user) {
+      return unauthorized();
     }
+
+    const account = await getAccountForUser(supabase, user.id);
+
+    if (!account) {
+      return badRequest("Conta do usuário não encontrada.");
+    }
+
+    if (account.status !== "active") {
+      return forbidden(
+        "Conta ainda não está ativa. Confirme seu e-mail para continuar."
+      );
+    }
+
+    const tenantId = account.tenant_id;
 
     let body: unknown;
     try {

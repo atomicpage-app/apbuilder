@@ -1,8 +1,45 @@
 "use client";
 
-// app/app/onboarding/business/BusinessForm.tsx
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+
+/* ---------------- helpers (mascara + normalizacao) ---------------- */
+
+function onlyDigits(v: string) {
+  return v.replace(/\D/g, "");
+}
+
+function maskPhone(value: string) {
+  const d = onlyDigits(value).slice(0, 11);
+
+  if (d.length <= 10) {
+    // (11) 3333-4444
+    return d.replace(
+      /^(\d{0,2})(\d{0,4})(\d{0,4})/,
+      (_, a, b, c) =>
+        [a && `(${a})`, b, c && `-${c}`].filter(Boolean).join(" ")
+    );
+  }
+
+  // (11) 99999-8888
+  return d.replace(
+    /^(\d{2})(\d{5})(\d{4})/,
+    "($1) $2-$3"
+  );
+}
+
+function maskZip(value: string) {
+  const d = onlyDigits(value).slice(0, 8);
+  return d.replace(/^(\d{5})(\d{0,3})/, (_, a, b) =>
+    b ? `${a}-${b}` : a
+  );
+}
+
+function isEmailLike(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+/* ------------------------------------------------------------------ */
 
 type FormState = {
   name: string;
@@ -21,14 +58,12 @@ type FormState = {
 
 type ApiError = { error?: string; message?: string };
 
-function isEmailLike(value: string) {
-  // MVP: validação leve (backend é autoridade)
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
 export default function BusinessForm() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
   const [form, setForm] = useState<FormState>({
     name: "",
     description: "",
@@ -43,9 +78,6 @@ export default function BusinessForm() {
     zip: "",
     complement: "",
   });
-
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   const requiredMissing = useMemo(() => {
     const required = [
@@ -88,17 +120,19 @@ export default function BusinessForm() {
       const payload = {
         name: form.name.trim(),
         description: form.description.trim(),
-        phoneCommercial: form.phoneCommercial.trim(),
-        mobileCommercial: form.mobileCommercial.trim() ? form.mobileCommercial.trim() : null,
+        phoneCommercial: onlyDigits(form.phoneCommercial),
+        mobileCommercial: form.mobileCommercial
+          ? onlyDigits(form.mobileCommercial)
+          : null,
         emailCommercial: form.emailCommercial.trim(),
         address: {
           street: form.street.trim(),
-          number: form.number.trim(),
+          number: onlyDigits(form.number),
           neighborhood: form.neighborhood.trim(),
           city: form.city.trim(),
-          state: form.state.trim(),
-          zip: form.zip.trim(),
-          complement: form.complement.trim() ? form.complement.trim() : null,
+          state: form.state.trim().toUpperCase(),
+          zip: onlyDigits(form.zip),
+          complement: form.complement.trim() || null,
         },
       };
 
@@ -108,7 +142,7 @@ export default function BusinessForm() {
         body: JSON.stringify(payload),
       });
 
-      const body = (await res.json().catch(() => ({}))) as ApiError & Record<string, unknown>;
+      const body = (await res.json().catch(() => ({}))) as ApiError;
 
       if (res.status === 201) {
         router.replace("/app");
@@ -137,16 +171,18 @@ export default function BusinessForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="text-base font-medium">Dados do negócio</h2>
+      {/* -------- Dados do negócio -------- */}
+      <section className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
+        <h2 className="text-base font-medium text-gray-900">
+          Dados do negócio
+        </h2>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">Nome *</label>
           <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             value={form.name}
             onChange={(e) => update("name", e.target.value)}
-            placeholder="Ex: Oficina do João"
             autoComplete="organization"
           />
         </div>
@@ -154,150 +190,134 @@ export default function BusinessForm() {
         <div className="space-y-2">
           <label className="text-sm font-medium">O que faz *</label>
           <textarea
-            className="min-h-[96px] w-full rounded-md border px-3 py-2 text-sm"
+            className="min-h-[96px] w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             value={form.description}
             onChange={(e) => update("description", e.target.value)}
-            placeholder="Descreva em uma frase o serviço ou atuação do negócio"
           />
         </div>
       </section>
 
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="text-base font-medium">Contato comercial</h2>
+      {/* -------- Contato -------- */}
+      <section className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
+        <h2 className="text-base font-medium text-gray-900">
+          Contato comercial
+        </h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Telefone comercial *</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.phoneCommercial}
-              onChange={(e) => update("phoneCommercial", e.target.value)}
-              placeholder="Ex: 1133334444"
-              autoComplete="tel"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Celular comercial</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.mobileCommercial}
-              onChange={(e) => update("mobileCommercial", e.target.value)}
-              placeholder="Ex: 11999998888"
-              autoComplete="tel"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">E-mail comercial *</label>
           <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            value={form.emailCommercial}
-            onChange={(e) => update("emailCommercial", e.target.value)}
-            placeholder="contato@seudominio.com"
-            autoComplete="email"
+            placeholder="Telefone comercial *"
+            inputMode="tel"
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={form.phoneCommercial}
+            onChange={(e) =>
+              update("phoneCommercial", maskPhone(e.target.value))
+            }
+          />
+
+          <input
+            placeholder="Celular comercial"
+            inputMode="tel"
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={form.mobileCommercial}
+            onChange={(e) =>
+              update("mobileCommercial", maskPhone(e.target.value))
+            }
           />
         </div>
+
+        <input
+          placeholder="E-mail comercial *"
+          inputMode="email"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          value={form.emailCommercial}
+          onChange={(e) => update("emailCommercial", e.target.value)}
+        />
       </section>
 
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="text-base font-medium">Endereço</h2>
+      {/* -------- Endereço -------- */}
+      <section className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
+        <h2 className="text-base font-medium text-gray-900">Endereço</h2>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Logradouro *</label>
+        <input
+          placeholder="Logradouro *"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          value={form.street}
+          onChange={(e) => update("street", e.target.value)}
+        />
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            value={form.street}
-            onChange={(e) => update("street", e.target.value)}
-            placeholder="Rua, Avenida..."
-            autoComplete="street-address"
+            placeholder="Número *"
+            inputMode="numeric"
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={form.number}
+            onChange={(e) =>
+              update("number", onlyDigits(e.target.value))
+            }
+          />
+
+          <input
+            placeholder="Bairro *"
+            className="sm:col-span-2 rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={form.neighborhood}
+            onChange={(e) => update("neighborhood", e.target.value)}
           />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="space-y-2 sm:col-span-1">
-            <label className="text-sm font-medium">Número *</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.number}
-              onChange={(e) => update("number", e.target.value)}
-              placeholder="123"
-            />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <label className="text-sm font-medium">Bairro *</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.neighborhood}
-              onChange={(e) => update("neighborhood", e.target.value)}
-              placeholder="Centro"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="space-y-2 sm:col-span-1">
-            <label className="text-sm font-medium">Cidade *</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.city}
-              onChange={(e) => update("city", e.target.value)}
-              placeholder="São Paulo"
-            />
-          </div>
-
-          <div className="space-y-2 sm:col-span-1">
-            <label className="text-sm font-medium">Estado *</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.state}
-              onChange={(e) => update("state", e.target.value)}
-              placeholder="SP"
-            />
-          </div>
-
-          <div className="space-y-2 sm:col-span-1">
-            <label className="text-sm font-medium">CEP *</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.zip}
-              onChange={(e) => update("zip", e.target.value)}
-              placeholder="01000-000"
-              autoComplete="postal-code"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Complemento</label>
           <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            value={form.complement}
-            onChange={(e) => update("complement", e.target.value)}
-            placeholder="Sala, bloco, apto..."
+            placeholder="Cidade *"
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={form.city}
+            onChange={(e) => update("city", e.target.value)}
+          />
+
+          <input
+            placeholder="UF *"
+            maxLength={2}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm uppercase"
+            value={form.state}
+            onChange={(e) =>
+              update("state", e.target.value.toUpperCase())
+            }
+          />
+
+          <input
+            placeholder="CEP *"
+            inputMode="numeric"
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={form.zip}
+            onChange={(e) =>
+              update("zip", maskZip(e.target.value))
+            }
           />
         </div>
+
+        <input
+          placeholder="Complemento"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          value={form.complement}
+          onChange={(e) => update("complement", e.target.value)}
+        />
       </section>
 
-      {error ? (
+      {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
-      ) : null}
+      )}
 
-      {info ? (
+      {info && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           {info}
         </div>
-      ) : null}
+      )}
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex justify-end">
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md border border-gray-300 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100 disabled:opacity-50"
         >
           {submitting ? "Salvando..." : "Salvar e continuar"}
         </button>

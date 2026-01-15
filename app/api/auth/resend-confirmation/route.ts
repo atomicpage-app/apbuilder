@@ -1,64 +1,137 @@
+// app/api/auth/resend-confirmation/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
+import { sha256 } from "@/lib/security/hash";
+import { rateLimitResend } from "@/lib/security/rate-limit";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error(
-    "Supabase não configurado corretamente. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
-  );
+function json(body: unknown, status = 200) {
+  return NextResponse.json(body, { status });
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+async function verifyTurnstile(
+  token: string,
+  ip?: string
+): Promise<boolean> {
+  const res = await fetch(
+    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        secret: process.env.TURNSTILE_SECRET_KEY!,
+        response: token,
+        ...(ip ? { remoteip: ip } : {}),
+      }),
+    }
+  );
 
-type ResendBody = {
-  email?: string;
-};
-
-const GENERIC_MESSAGE =
-  "Se existir uma conta com este e-mail, enviaremos um novo link de confirmação.";
+  if (!res.ok) return false;
+  const data = await res.json();
+  return data.success === true;
+}
 
 export async function POST(request: NextRequest) {
-  let body: ResendBody;
+  const ts = Date.now();
 
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ message: GENERIC_MESSAGE }, { status: 200 });
-  }
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown";
 
-  const email = String(body.email ?? "").trim().toLowerCase();
+    const body = await request.json().catch(() => null);
+    const email =
+      typeof body?.email === "string"
+        ? body.email.trim().toLowerCase()
+        : null;
 
-  if (!email) {
-    return NextResponse.json({ message: GENERIC_MESSAGE }, { status: 200 });
-  }
+    const turnstileToken =
+      typeof body?.turnstileToken === "string"
+        ? body.turnstileToken
+        : null;
 
-  const appUrl = APP_URL || request.nextUrl.origin;
-
-  try {
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email,
-      options: {
-        emailRedirectTo: `${appUrl}/sign-in?confirmed=1`,
-      },
-    });
-
-    if (error) {
-      console.error(
-        "[auth/resend-confirmation] Erro ao reenviar confirmação:",
-        error
-      );
+    if (!email || !email.includes("@") || !turnstileToken) {
+      return json({ ok: false, error: "invalid_request" }, 400);
     }
 
-    return NextResponse.json({ message: GENERIC_MESSAGE }, { status: 200 });
-  } catch (error) {
-    console.error(
-      "[auth/resend-confirmation] Erro inesperado ao processar reenvio:",
-      error
+    const turnstileOk = await verifyTurnstile(turnstileToken, ip);
+
+    if (!turnstileOk) {
+      console.warn({
+        level: "warn",
+        event: "auth.resend_confirmation",
+        result: "bot_blocked",
+        ts,
+      });
+
+      return json({ ok: false, error: "invalid_request" }, 400);
+    }
+
+    const ipHash = sha256(ip);
+    const emailHash = sha256(email);
+
+    const rl = await rateLimitResend(ipHash, emailHash);
+
+    if (!rl.allowed) {
+      console.warn({
+        level: "warn",
+        event: "auth.resend_confirmation",
+        result: "rate_limited",
+        dimension: rl.dimension,
+        ip_hash: ipHash,
+        email_hash: emailHash,
+        ts,
+      });
+
+      return json({ ok: false, error: "rate_limited" }, 429);
+    }
+
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-    return NextResponse.json({ message: GENERIC_MESSAGE }, { status: 200 });
+
+    await supabase.auth.resend({
+      type: "signup",
+      email,
+    });
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    await resend.emails.send({
+      from: "no-reply@seusite.com",
+      to: email,
+      subject: "Confirme seu e-mail",
+      html: `
+        <p>Você solicitou um novo link de confirmação.</p>
+        <p>Se não foi você, ignore este e-mail.</p>
+      `,
+    });
+
+    console.info({
+      level: "info",
+      event: "auth.resend_confirmation",
+      result: "ok",
+      ip_hash: ipHash,
+      email_hash: emailHash,
+      ts,
+    });
+
+    return json({
+      ok: true,
+      message:
+        "Se existir uma conta com esse e-mail, um novo link de confirmação foi enviado.",
+    });
+  } catch (err) {
+    console.error({
+      level: "error",
+      event: "auth.resend_confirmation",
+      result: "provider_error",
+      message: err instanceof Error ? err.message : "unknown",
+      ts,
+    });
+
+    return json({ ok: false, error: "internal_error" }, 500);
   }
 }
