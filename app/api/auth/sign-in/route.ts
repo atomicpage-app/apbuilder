@@ -1,31 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import type { Database } from "@/lib/supabase/database.types";
+import { createSupabaseRouteClient } from "@/lib/supabase/route";
 
-export async function POST(request: NextRequest) {
-  const response = NextResponse.json({}, { status: 200 });
+export async function POST(req: NextRequest) {
+  // ✅ Response válida para Route Handler
+  const res = NextResponse.json({ ok: false }, { status: 200 });
 
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
+  const supabase = createSupabaseRouteClient(req, res);
 
   let body: { email?: string; password?: string };
 
   try {
-    body = await request.json();
+    body = await req.json();
   } catch {
     return NextResponse.json(
       { error: "Payload inválido." },
@@ -33,8 +18,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const email = body.email?.trim();
-  const password = body.password;
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const password = String(body.password ?? "");
 
   if (!email || !password) {
     return NextResponse.json(
@@ -43,17 +28,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
+  // 🔐 Login
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
-  if (error) {
+  if (error || !data.user) {
     return NextResponse.json(
-      { error: error.message },
+      { error: error?.message ?? "Falha no login." },
       { status: 401 }
     );
   }
 
-  return response;
+  const user = data.user;
+
+  // 🔁 P3.3 — ativação automática pós-confirmação
+  if (user.email_confirmed_at) {
+    const { data: account } = await supabase
+      .from("accounts")
+      .select("status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (account && account.status !== "active") {
+      await supabase
+        .from("accounts")
+        .update({ status: "active" })
+        .eq("user_id", user.id);
+    }
+  }
+
+  // ✅ Retornar a MESMA response (cookies já setados)
+  res.headers.set("Cache-Control", "no-store");
+  return NextResponse.json({ ok: true }, { headers: res.headers });
 }
