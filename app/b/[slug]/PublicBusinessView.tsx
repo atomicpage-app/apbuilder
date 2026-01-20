@@ -1,25 +1,39 @@
+type Product = {
+  id: string
+  title: string
+  short_description: string | null
+  price_cents: number | null
+  currency: string | null
+  cta_label: string | null
+}
+
 type Props = {
   business: {
-    name: string;
-    description: string;
-    phone_commercial: string;
-    mobile_commercial?: string | null;
-    email_commercial: string;
-    address_street: string;
-    address_number: string;
-    address_neighborhood: string;
-    address_city: string;
-    address_state: string;
-    address_zip: string;
-    address_complement?: string | null;
-    map_url?: string | null;
-    social_links?: Record<string, string> | null;
-  };
-};
+    name: string
+    description: string
+    phone_commercial: string
+    mobile_commercial?: string | null
+    email_commercial: string
 
-export default function PublicBusinessView({ business }: Props) {
-  const phoneLink = `tel:${business.phone_commercial.replace(/\D/g, "")}`;
-  const emailLink = `mailto:${business.email_commercial}`;
+    address_street: string
+    address_number: string
+    address_neighborhood: string
+    address_city: string
+    address_state: string
+    address_zip: string
+    address_complement?: string | null
+
+    map_url?: string | null
+    social_links?: Record<string, string> | null
+  }
+  products?: Product[]
+}
+
+export default function PublicBusinessView({ business, products }: Props) {
+  const phoneLink = `tel:${business.phone_commercial.replace(/\D/g, "")}`
+  const emailLink = `mailto:${business.email_commercial}`
+
+  const hasProducts = Array.isArray(products) && products.length > 0
 
   return (
     <div className="bg-base-100 text-base-content">
@@ -74,13 +88,48 @@ export default function PublicBusinessView({ business }: Props) {
         </div>
       </section>
 
-      {/* PRODUTOS (ESTÁTICO) */}
+      {/* PRODUTOS / SERVIÇOS */}
       <section id="produtos" className="py-[80px]">
         <div className="max-w-[1440px] mx-auto px-[120px]">
           <h2>Produtos e serviços</h2>
-          <p className="mt-4 text-gray-500">
-            Conteúdo demonstrativo.
-          </p>
+
+          {hasProducts ? (
+            <div className="grid grid-cols-3 gap-8 mt-8">
+              {products!.map((product) => (
+                <div
+                  key={product.id}
+                  className="card bg-base-100 shadow-md border"
+                >
+                  <div className="card-body">
+                    <h3 className="card-title">{product.title}</h3>
+
+                    {product.short_description && (
+                      <p className="text-sm text-gray-600">
+                        {product.short_description}
+                      </p>
+                    )}
+
+                    {product.price_cents !== null && (
+                      <p className="mt-4 font-semibold">
+                        {product.currency ?? 'BRL'}{' '}
+                        {(product.price_cents / 100).toFixed(2)}
+                      </p>
+                    )}
+
+                    <div className="card-actions justify-end mt-4">
+                      <a href="#contato" className="btn btn-outline btn-sm">
+                        {product.cta_label ?? 'Solicitar informações'}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-gray-500">
+              Entre em contato para conhecer nossos serviços.
+            </p>
+          )}
         </div>
       </section>
 
@@ -135,5 +184,5 @@ export default function PublicBusinessView({ business }: Props) {
         </div>
       </footer>
     </div>
-  );
+  )
 }

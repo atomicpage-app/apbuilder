@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
@@ -16,251 +14,168 @@ export type Database = {
     Tables: {
       accounts: {
         Row: {
-          created_at: string
-          email: string
           id: string
+          user_id: string
+          tenant_id: string
           name: string
+          email: string
           phone: string | null
           status: Database["public"]["Enums"]["account_status"]
-          tenant_id: string
+          created_at: string
           updated_at: string
-          user_id: string
         }
         Insert: {
-          created_at?: string
-          email: string
           id?: string
+          user_id: string
+          tenant_id?: string
           name: string
+          email: string
           phone?: string | null
           status?: Database["public"]["Enums"]["account_status"]
-          tenant_id?: string
+          created_at?: string
           updated_at?: string
-          user_id: string
         }
         Update: {
-          created_at?: string
-          email?: string
-          id?: string
           name?: string
+          email?: string
           phone?: string | null
           status?: Database["public"]["Enums"]["account_status"]
-          tenant_id?: string
           updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }
+
       business: {
         Row: {
-          address_city: string
-          address_complement: string | null
-          address_neighborhood: string
-          address_number: string
-          address_state: string
-          address_street: string
-          address_zip: string
-          created_at: string
-          description: string
-          email_commercial: string
           id: string
+          tenant_id: string
+          status: Database["public"]["Enums"]["business_status"]
+          created_at: string
+          updated_at: string
+
+          name: string
+          description: string
+          phone_commercial: string
+          mobile_commercial: string | null
+          email_commercial: string
+
+          address_street: string
+          address_number: string
+          address_neighborhood: string
+          address_city: string
+          address_state: string
+          address_zip: string
+          address_complement: string | null
+
+          public_slug: string | null
           logo_path: string | null
           map_url: string | null
-          mobile_commercial: string | null
-          name: string
-          phone_commercial: string
-          public_slug: string | null
           social_links: Json | null
-          status: Database["public"]["Enums"]["business_status"]
-          tenant_id: string
-          updated_at: string
         }
         Insert: {
-          address_city: string
-          address_complement?: string | null
-          address_neighborhood: string
-          address_number: string
-          address_state: string
-          address_street: string
-          address_zip: string
-          created_at?: string
+          tenant_id: string
+          name: string
           description: string
+          phone_commercial: string
           email_commercial: string
-          id?: string
+
+          address_street: string
+          address_number: string
+          address_neighborhood: string
+          address_city: string
+          address_state: string
+          address_zip: string
+
+          mobile_commercial?: string | null
+          address_complement?: string | null
           logo_path?: string | null
           map_url?: string | null
-          mobile_commercial?: string | null
-          name: string
-          phone_commercial: string
-          public_slug?: string | null
           social_links?: Json | null
+          public_slug?: string | null
           status?: Database["public"]["Enums"]["business_status"]
-          tenant_id: string
-          updated_at?: string
         }
         Update: {
-          address_city?: string
-          address_complement?: string | null
-          address_neighborhood?: string
-          address_number?: string
-          address_state?: string
-          address_street?: string
-          address_zip?: string
-          created_at?: string
+          name?: string
           description?: string
+          phone_commercial?: string
+          mobile_commercial?: string | null
           email_commercial?: string
-          id?: string
+
+          address_street?: string
+          address_number?: string
+          address_neighborhood?: string
+          address_city?: string
+          address_state?: string
+          address_zip?: string
+          address_complement?: string | null
+
           logo_path?: string | null
           map_url?: string | null
-          mobile_commercial?: string | null
-          name?: string
-          phone_commercial?: string
-          public_slug?: string | null
           social_links?: Json | null
+          public_slug?: string | null
           status?: Database["public"]["Enums"]["business_status"]
-          tenant_id?: string
-          updated_at?: string
         }
         Relationships: []
       }
     }
+
     Views: {
-      [_ in never]: never
+      public_business_with_products: {
+        Row: {
+          id: string
+          public_slug: string
+          status: "published"
+          created_at: string
+          updated_at: string
+
+          name: string
+          description: string
+          phone_commercial: string
+          mobile_commercial: string | null
+          email_commercial: string
+
+          address_street: string
+          address_number: string
+          address_neighborhood: string
+          address_city: string
+          address_state: string
+          address_zip: string
+          address_complement: string | null
+
+          logo_path: string | null
+          map_url: string | null
+          social_links: Json | null
+
+          products: {
+            id: string
+            type: "service" | "product" | "package"
+            title: string
+            short_description: string | null
+            price_cents: number | null
+            currency: string | null
+            cta_label: string | null
+            image_url: string | null
+            position: number
+          }[]
+        }
+      }
     }
-    Functions: {
-      [_ in never]: never
-    }
+
     Enums: {
       account_status: "pending_email_verification" | "active" | "disabled"
       business_status: "draft" | "published"
     }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+
+    Functions: {}
+    CompositeTypes: {}
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+/* ---------- Helpers padrão Supabase ---------- */
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type PublicSchema = Database["public"]
 
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      account_status: ["pending_email_verification", "active", "disabled"],
-      business_status: ["draft", "published"],
-    },
-  },
-} as const
+export type Tables<T extends keyof (PublicSchema["Tables"] & PublicSchema["Views"])> =
+  (PublicSchema["Tables"] & PublicSchema["Views"])[T] extends { Row: infer R }
+    ? R
+    : never
