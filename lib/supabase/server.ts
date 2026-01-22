@@ -1,10 +1,9 @@
 // lib/supabase/server.ts
-import "server-only";
+import 'server-only';
 
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
-import type { User } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/database.types";
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
+import type { Database } from '@/lib/supabase/database.types';
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
@@ -14,11 +13,11 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
-const SUPABASE_URL = getRequiredEnv("NEXT_PUBLIC_SUPABASE_URL");
-const SUPABASE_ANON_KEY = getRequiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+const SUPABASE_URL = getRequiredEnv('NEXT_PUBLIC_SUPABASE_URL');
+const SUPABASE_ANON_KEY = getRequiredEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
 export async function createSupabaseServerClient() {
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
 
   return createServerClient<Database>(
     SUPABASE_URL,
@@ -28,18 +27,8 @@ export async function createSupabaseServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        // Server Components não podem mutar cookies
         setAll() {},
       },
     }
   );
-}
-
-export async function getCurrentUser(): Promise<User | null> {
-  const supabase = await createSupabaseServerClient();
-
-  const { data, error } = await supabase.auth.getUser();
-  if (error) return null;
-
-  return data.user ?? null;
 }
