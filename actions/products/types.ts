@@ -1,0 +1,20 @@
+export type ActionResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: ActionError };
+
+export type ActionError = {
+  code: ActionErrorCode;
+  message?: string;
+};
+
+export enum ActionErrorCode {
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  PRODUCT_NOT_FOUND = 'PRODUCT_NOT_FOUND',
+  FORBIDDEN_CROSS_TENANT = 'FORBIDDEN_CROSS_TENANT',
+  INVALID_STATE_TRANSITION = 'INVALID_STATE_TRANSITION',
+  INVALID_VISIBILITY_STATE = 'INVALID_VISIBILITY_STATE',
+  VALIDATION_FAILED = 'VALIDATION_FAILED',
+  PUBLISHED_LIMIT_REACHED = 'PUBLISHED_LIMIT_REACHED',
+  ALREADY_ARCHIVED = 'ALREADY_ARCHIVED',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+}

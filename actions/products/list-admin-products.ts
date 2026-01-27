@@ -14,15 +14,14 @@ type BusinessId = Pick<
   'id'
 >;
 
-type ProductRow = Database['public']['Tables']['products']['Row'];
+type AdminProduct = Pick<
+  Database['public']['Tables']['products']['Row'],
+  'id' | 'title' | 'status' | 'type' | 'price_cents' | 'currency' | 'position'
+>;
 
-type UpdateDraftInput = Partial<
-  Database['public']['Tables']['products']['Update']
-> & { productId: string };
-
-export async function updateProductDraft(
-  input: UpdateDraftInput
-): Promise<ActionResult<null>> {
+export async function listAdminProducts(): Promise<
+  ActionResult<AdminProduct[]>
+> {
   try {
     const supabase = await createSupabaseServerClient();
 
@@ -59,48 +58,32 @@ export async function updateProductDraft(
 
     const business: BusinessId = businessResult.data;
 
-    const productResult = await supabase
+    const productsResult = await supabase
       .from('products')
-      .select('*')
-      .eq('id', input.productId)
+      .select('id,title,status,type,price_cents,currency,position')
       .eq('business_id', business.id)
-      .single();
+      .order('position', { ascending: true });
 
-    if (
-      productResult.error ||
-      !productResult.data ||
-      productResult.data.status !== 'draft'
-    ) {
-      return {
-        ok: false,
-        error: { code: ActionErrorCode.UNAUTHORIZED },
-      };
-    }
-
-    const product: ProductRow = productResult.data;
-
-    const updateResult = await supabase
-      .from('products')
-      .update(input)
-      .eq('id', product.id);
-
-    if (updateResult.error) {
+    if (productsResult.error) {
       return {
         ok: false,
         error: {
           code: ActionErrorCode.UNKNOWN_ERROR,
-          message: updateResult.error.message,
+          message: productsResult.error.message,
         },
       };
     }
 
-    return { ok: true, data: null };
+    return {
+      ok: true,
+      data: productsResult.data ?? [],
+    };
   } catch (err) {
     return {
       ok: false,
       error: {
         code: ActionErrorCode.UNKNOWN_ERROR,
-        message: err instanceof Error ? err.message : 'Unknown error',
+        message: err instanceof Error ? err.message : 'Erro desconhecido',
       },
     };
   }

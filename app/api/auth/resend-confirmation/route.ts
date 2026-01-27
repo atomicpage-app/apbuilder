@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { sha256 } from "@/lib/security/hash";
-import { rateLimitResend } from "@/lib/security/rate-limit";
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status });
@@ -68,24 +67,9 @@ export async function POST(request: NextRequest) {
       return json({ ok: false, error: "invalid_request" }, 400);
     }
 
+    // Hashes mantidos para logging/observabilidade
     const ipHash = sha256(ip);
     const emailHash = sha256(email);
-
-    const rl = await rateLimitResend(ipHash, emailHash);
-
-    if (!rl.allowed) {
-      console.warn({
-        level: "warn",
-        event: "auth.resend_confirmation",
-        result: "rate_limited",
-        dimension: rl.dimension,
-        ip_hash: ipHash,
-        email_hash: emailHash,
-        ts,
-      });
-
-      return json({ ok: false, error: "rate_limited" }, 429);
-    }
 
     const supabase = createClient(
       process.env.SUPABASE_URL!,
