@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { User } from "@supabase/supabase-js";
 
 type CreateBusinessAddressPayload = {
   street: string;
@@ -106,18 +107,45 @@ function validatePayload(body: unknown): CreateBusinessPayload | null {
   };
 }
 
-async function getAccountForUser(
+async function getOrCreateAccount(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  userId: string
+  user: {
+    id: string;
+    email: string;
+    user_metadata?: Record<string, unknown>;
+  }
 ) {
-  const { data, error } = await supabase
+  const { data: existing, error } = await supabase
     .from("accounts")
-    .select("tenant_id, status")
-    .eq("user_id", userId)
+    .select("id, tenant_id, status")
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) throw error;
-  return data ?? null;
+  if (existing) return existing;
+
+  const name =
+    typeof user.user_metadata?.name === "string" &&
+    user.user_metadata.name.trim().length > 0
+      ? user.user_metadata.name.trim()
+      : user.email.split("@")[0];
+
+  const { data: created, error: insertError } = await supabase
+    .from("accounts")
+    .insert({
+      user_id: user.id,
+      email: user.email,
+      name,
+      status: "active",
+    })
+    .select("id, tenant_id, status")
+    .single();
+
+  if (insertError || !created) {
+    throw insertError ?? new Error("Falha ao criar account.");
+  }
+
+  return created;
 }
 
 export async function POST(req: NextRequest) {
@@ -133,11 +161,16 @@ export async function POST(req: NextRequest) {
       return unauthorized();
     }
 
-    const account = await getAccountForUser(supabase, user.id);
-
-    if (!account) {
-      return badRequest("Conta do usuário não encontrada.");
+    // 🔒 Garantia explícita para TS e regra de negócio
+    if (!user.email) {
+      return badRequest("Usuário sem e-mail válido.");
     }
+
+    const account = await getOrCreateAccount(supabase, {
+      id: user.id,
+      email: user.email,
+      user_metadata: user.user_metadata,
+    });
 
     if (account.status !== "active") {
       return forbidden(

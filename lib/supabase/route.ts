@@ -1,4 +1,3 @@
-// lib/supabase/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
@@ -28,7 +27,11 @@ export function createSupabaseRouteClient(
         },
         setAll(cookies) {
           cookies.forEach(({ name, value, options }) => {
-            res.cookies.set({ name, value, ...options });
+            res.cookies.set({
+              name,
+              value,
+              ...options,
+            });
           });
         },
       },

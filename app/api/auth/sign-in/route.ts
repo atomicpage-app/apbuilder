@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase/route";
 
+export const runtime = "nodejs";
+
 export async function POST(req: NextRequest) {
-  // ✅ Response válida para Route Handler
-  const res = NextResponse.json({ ok: false }, { status: 200 });
+  const res = NextResponse.json(null, { status: 200 });
 
   const supabase = createSupabaseRouteClient(req, res);
 
@@ -28,7 +29,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 🔐 Login
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
 
   const user = data.user;
 
-  // 🔁 P3.3 — ativação automática pós-confirmação
   if (user.email_confirmed_at) {
     const { data: account } = await supabase
       .from("accounts")
@@ -59,7 +58,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ✅ Retornar a MESMA response (cookies já setados)
   res.headers.set("Cache-Control", "no-store");
+  res.headers.set("Content-Type", "application/json");
+
   return NextResponse.json({ ok: true }, { headers: res.headers });
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-export default function SignInPage() {
+function SignInForm() {
   const searchParams = useSearchParams();
   const next =
     searchParams.get("next") || "/app/onboarding/business";
@@ -38,7 +38,6 @@ export default function SignInPage() {
         return;
       }
 
-      // hard redirect após login OK
       window.location.href = next;
     } catch {
       setError("Erro inesperado. Tente novamente.");
@@ -106,5 +105,13 @@ export default function SignInPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignInForm />
+    </Suspense>
   );
 }
