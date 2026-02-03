@@ -1,54 +1,96 @@
-import { listAdminProducts } from '@/actions/products/list-admin-products';
-import { publishProduct } from '@/actions/products/publish-product';
-import { archiveProduct } from '@/actions/products/archive-product';
-import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
+import Link from 'next/link';
 
-export default async function AdminProductsPage() {
-  const result = await listAdminProducts();
+import AdminBreadcrumb from 'app/components/AdminBreadcrumb';
+import AdminPageHeader from 'app/components/AdminPageHeader';
 
-  if (!result.ok) {
-    return <p>Erro ao carregar produtos</p>;
+export default async function ProductsPage() {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  const businessResult = await supabase
+    .from('business')
+    .select('id')
+    .limit(1);
+
+  if (!businessResult.data || businessResult.data.length === 0) {
+    throw new Error('Business não resolvido.');
   }
 
-  async function handlePublish(productId: string) {
-    'use server';
-    await publishProduct({ productId });
-    revalidatePath('/admin/products');
-  }
+  const businessId = businessResult.data[0].id;
 
-  async function handleArchive(productId: string) {
-    'use server';
-    await archiveProduct({ productId });
-    revalidatePath('/admin/products');
-  }
+  const productsResult = await supabase
+    .from('products')
+    .select('id, title, status')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+
+  const products = productsResult.data ?? [];
 
   return (
-    <div>
-      <h1>Produtos</h1>
+    <div className="space-y-6">
+      <AdminBreadcrumb />
 
-      <ul>
-        {result.data.map((product) => (
-          <li key={product.id}>
-            <strong>{product.title}</strong> — {product.status}
+      <AdminPageHeader
+        title="Produtos"
+        description="Área de produtos do Painel do Negócio"
+        action={
+          <Link
+            href="/products/new"
+            className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white"
+          >
+            + Criar produto
+          </Link>
+        }
+      />
 
-            {product.status === 'draft' && (
-              <>
-                {' '}
-                <a href={`/admin/products/${product.id}`}>Editar</a>{' '}
-                <form action={handlePublish.bind(null, product.id)}>
-                  <button type="submit">Publicar</button>
-                </form>
-              </>
-            )}
+      <section className="rounded-lg border border-gray-200 bg-white">
+        <ul className="divide-y">
+          {products.length === 0 && (
+            <li className="p-6 text-sm text-gray-500">
+              Nenhum produto cadastrado ainda.
+            </li>
+          )}
 
-            {product.status === 'published' && (
-              <form action={handleArchive.bind(null, product.id)}>
-                <button type="submit">Arquivar</button>
-              </form>
-            )}
-          </li>
-        ))}
-      </ul>
+          {products.map((product) => (
+            <li
+              key={product.id}
+              className="flex items-center justify-between p-4"
+            >
+              <div>
+                <Link
+                  href={`/products/${product.id}`}
+                  className="font-medium text-gray-900 hover:underline"
+                >
+                  {product.title}
+                </Link>
+                <p className="text-xs text-gray-500">
+                  Status: {product.status}
+                </p>
+              </div>
+
+              <Link
+                href={`/products/${product.id}/edit`}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Editar
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

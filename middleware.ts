@@ -1,3 +1,4 @@
+// middleware.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
@@ -18,14 +19,17 @@ const ACCOUNT_STATE_REDIRECTS: Record<string, string> = {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // APIs fora
   if (pathname.startsWith("/api")) {
     return NextResponse.next();
   }
 
+  // Rotas públicas
   if (PUBLIC_PATHS.has(pathname)) {
     return NextResponse.next();
   }
 
+  // Assets
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon.ico")
@@ -53,14 +57,22 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Sessão
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  console.log("[MW][SESSION]", {
+    path: pathname,
+    hasUser: Boolean(user),
+    userId: user?.id ?? null,
+  });
 
   if (!user) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
   }
 
+  // Email não confirmado
   if (!user.email_confirmed_at) {
     if (pathname.startsWith("/verify-email")) {
       return response;
@@ -68,17 +80,27 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/verify-email", request.url));
   }
 
+  // Account
   const { data: account } = await supabase
     .from("accounts")
     .select("id, tenant_id, status")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  // Usuário sem account ainda → onboarding decide
+  console.log("[MW][ACCOUNT]", {
+    path: pathname,
+    userId: user.id,
+    accountFound: Boolean(account),
+    tenantId: account?.tenant_id ?? null,
+    status: account?.status ?? null,
+  });
+
+  // Usuário ainda sem account → onboarding decide
   if (!account) {
     return response;
   }
 
+  // Estados avançados
   if (account.status !== "active") {
     const redirectPath = ACCOUNT_STATE_REDIRECTS[account.status];
     if (!redirectPath) {
@@ -91,28 +113,35 @@ export async function middleware(request: NextRequest) {
   }
 
   /**
-   * Regras de negócio do app (onboarding de business)
-   * Compatível com dados legados
+   * REGRA ÚNICA DE BUSINESS
+   * business EXISTE ⇔ tenant_id
    */
   if (pathname.startsWith("/app")) {
     const { data: business } = await supabase
       .from("business")
       .select("id")
-      .or(
-        [
-          account.tenant_id
-            ? `tenant_id.eq.${account.tenant_id}`
-            : null,
-          `account_id.eq.${account.id}`,
-        ]
-          .filter(Boolean)
-          .join(",")
-      )
+      .eq("tenant_id", account.tenant_id)
       .maybeSingle();
 
+    console.log("[MW][BUSINESS]", {
+      path: pathname,
+      tenantId: account.tenant_id,
+      businessFound: Boolean(business),
+    });
+
+    console.log('[MW][PATH]', request.nextUrl.pathname);
+
+    // Não tem business → onboarding
     if (!business && !pathname.startsWith("/app/onboarding")) {
       return NextResponse.redirect(
         new URL("/app/onboarding/business", request.url)
+      );
+    }
+
+    // Tem business → nunca voltar ao onboarding
+    if (business && pathname.startsWith("/app/onboarding")) {
+      return NextResponse.redirect(
+        new URL("/home", request.url)
       );
     }
   }
@@ -121,7 +150,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!api|_next/static|_next/image).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image).*)"],
 };

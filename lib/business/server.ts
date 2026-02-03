@@ -1,61 +1,52 @@
 // lib/business/server.ts
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/database.types";
 
-export type TenantAccount = {
-  tenant_id: string;
-};
+export type BusinessRow =
+  Database["public"]["Tables"]["business"]["Row"];
 
-export type BusinessRow = {
-  id: string;
-  tenant_id: string;
-  status: "draft" | "published";
-  name: string;
-  description: string;
-  phone_commercial: string;
-  mobile_commercial: string | null;
-  email_commercial: string;
-  address_street: string;
-  address_number: string;
-  address_neighborhood: string;
-  address_city: string;
-  address_state: string;
-  address_zip: string;
-  address_complement: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export async function getTenantIdForUserId(userId: string): Promise<string | null> {
+/**
+ * Fonte única da verdade:
+ * auth.user -> accounts -> tenant_id -> business
+ */
+export async function getBusinessForUserId(
+  userId: string
+): Promise<BusinessRow | null> {
   const supabase = await createSupabaseServerClient();
 
-  const { data, error } = await supabase
+  /**
+   * 1. Account (pode não existir)
+   */
+  const { data: account, error: accountError } = await supabase
     .from("accounts")
     .select("tenant_id")
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error) {
-    console.error("getTenantIdForUserId: accounts query error", error);
+  if (accountError) {
+    console.error("getBusinessForUserId: account error", accountError);
     return null;
   }
 
-  return (data?.tenant_id as string | null) ?? null;
-}
+  if (!account?.tenant_id) {
+    return null;
+  }
 
-export async function getBusinessByTenantId(tenantId: string): Promise<BusinessRow | null> {
-  const supabase = await createSupabaseServerClient();
-
-  const { data, error } = await supabase
+  /**
+   * 2. Business (1 por tenant)
+   */
+  const { data: business, error: businessError } = await supabase
     .from("business")
     .select("*")
-    .eq("tenant_id", tenantId)
+    .eq("tenant_id", account.tenant_id)
+    .returns<BusinessRow>()
     .maybeSingle();
 
-  if (error) {
-    console.error("getBusinessByTenantId: business query error", error);
+  if (businessError) {
+    console.error("getBusinessForUserId: business error", businessError);
     return null;
   }
 
-  return (data as BusinessRow | null) ?? null;
+  return business ?? null;
 }
