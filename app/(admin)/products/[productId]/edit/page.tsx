@@ -40,7 +40,8 @@ export default async function ProductEditPage({ params }: PageProps) {
       status
       `
     )
-    .eq('id', productId);
+    .eq('id', productId)
+    .limit(1);
 
   if (!productResult.data || productResult.data.length === 0) {
     throw new Error('Produto não encontrado.');

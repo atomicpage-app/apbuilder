@@ -3,24 +3,27 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 
-import {
-  UpdateProductDraftPayload,
-  UpdateProductDraftResult,
-  ProductDraftEditableFields,
-} from '../../types/product-edit';
+/**
+ * Campos editáveis do produto (draft / published)
+ */
+export type UpdateProductDraftInput = {
+  productId: string;
+  title: string;
+  description: string | null;
+  price: number | null;
+  unit: string | null;
+  cta_label: string | null;
+  image_url: string | null;
+};
 
-function isValidUrl(value: string): boolean {
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
+export type UpdateProductDraftResult =
+  | { ok: true }
+  | { ok: false; message: string };
 
-export async function updateProductDraftAction(
-  payload: UpdateProductDraftPayload
+export async function updateProductDraft(
+  input: UpdateProductDraftInput
 ): Promise<UpdateProductDraftResult> {
+  // ⚠️ cookies() é async — PRECISA de await
   const cookieStore = await cookies();
 
   const supabase = createServerClient(
@@ -35,123 +38,58 @@ export async function updateProductDraftAction(
     }
   );
 
-  const { productId, data } = payload;
-
-  if (!productId) {
-    return {
-      success: false,
-      code: 'VALIDATION_ERROR',
-      message: 'Produto inválido.',
-    };
-  }
-
-  // ------------------------
-  // Validações mínimas
-  // ------------------------
-
-  if (typeof data.title === 'string') {
-    const title = data.title.trim();
-    if (title.length < 3 || title.length > 80) {
-      return {
-        success: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Título deve ter entre 3 e 80 caracteres.',
-      };
-    }
-  }
-
-  if (data.price !== undefined && data.price !== null) {
-    if (!Number.isFinite(data.price) || data.price < 0) {
-      return {
-        success: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Preço inválido.',
-      };
-    }
-  }
-
-  if (typeof data.image_url === 'string' && data.image_url.length > 0) {
-    if (!isValidUrl(data.image_url)) {
-      return {
-        success: false,
-        code: 'VALIDATION_ERROR',
-        message: 'URL de imagem inválida.',
-      };
-    }
-  }
-
-  // ------------------------
-  // Resolver business
-  // ------------------------
-
-  const businessResult = await supabase
-    .from('business')
-    .select('id')
-    .limit(1);
-
-  if (businessResult.error || !businessResult.data || businessResult.data.length === 0) {
-    return {
-      success: false,
-      code: 'UNKNOWN',
-      message: 'Business não resolvido.',
-    };
-  }
-
-  const businessId = businessResult.data[0].id as string;
-
-  // ------------------------
-  // Garantir que produto pertence ao business
-  // ------------------------
-
+  // --------------------------------------------------
+  // 1. Validar existência e status do produto
+  // --------------------------------------------------
   const productResult = await supabase
     .from('products')
-    .select('id')
-    .eq('id', productId)
-    .eq('business_id', businessId)
+    .select('status')
+    .eq('id', input.productId)
     .limit(1);
 
-  if (productResult.error || !productResult.data || productResult.data.length === 0) {
+  if (!productResult.data || productResult.data.length === 0) {
+    return { ok: false, message: 'Produto não encontrado.' };
+  }
+
+  const status = productResult.data[0].status;
+
+  if (status === 'archived') {
     return {
-      success: false,
-      code: 'NOT_FOUND',
-      message: 'Produto não encontrado.',
+      ok: false,
+      message: 'Produto arquivado não pode ser editado.',
     };
   }
 
-  // ------------------------
-  // Payload de update
-  // - força status = draft
-  // ------------------------
+  // --------------------------------------------------
+  // 2. Converter preço (UI → DB)
+  // --------------------------------------------------
+  const price_cents =
+    input.price !== null
+      ? Math.round(input.price * 100)
+      : null;
 
-  const updatePayload: Partial<ProductDraftEditableFields> & { status: 'draft' } = {
-    status: 'draft',
-  };
-
-  if (data.title !== undefined) updatePayload.title = data.title.trim();
-  if (data.description !== undefined) updatePayload.description = data.description;
-  if (data.price !== undefined) updatePayload.price = data.price;
-  if (data.unit !== undefined) updatePayload.unit = data.unit;
-  if (data.cta_label !== undefined) updatePayload.cta_label = data.cta_label;
-  if (data.image_url !== undefined) updatePayload.image_url = data.image_url;
-
+  // --------------------------------------------------
+  // 3. Atualizar produto
+  // --------------------------------------------------
   const updateResult = await supabase
     .from('products')
-    .update(updatePayload)
-    .eq('id', productId)
-    .eq('business_id', businessId)
-    .select('title, description, price, unit, cta_label, image_url')
-    .limit(1);
+    .update({
+      title: input.title,
+      description: input.description,
+      price_cents,
+      unit: input.unit,
+      cta_label: input.cta_label,
+      image_url: input.image_url,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.productId);
 
-  if (updateResult.error || !updateResult.data || updateResult.data.length === 0) {
+  if (updateResult.error) {
     return {
-      success: false,
-      code: 'UNKNOWN',
+      ok: false,
       message: 'Erro ao salvar alterações.',
     };
   }
 
-  return {
-    success: true,
-    product: updateResult.data[0] as ProductDraftEditableFields,
-  };
+  return { ok: true };
 }

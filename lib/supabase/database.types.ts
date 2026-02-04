@@ -179,6 +179,7 @@ export type Database = {
           status: Database["public"]["Enums"]["product_status"]
           title: string
           type: Database["public"]["Enums"]["product_type"]
+          unit: string | null
           updated_at: string
         }
         Insert: {
