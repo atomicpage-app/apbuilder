@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createProductDraft } from '@/actions/products/create-draft';
+import { createProductDraft } from '../actions/create-draft';
 
 export default async function NewProductPage() {
   const result = await createProductDraft();

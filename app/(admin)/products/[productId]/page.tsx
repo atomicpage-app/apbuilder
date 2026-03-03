@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import Link from 'next/link';
@@ -5,11 +7,14 @@ import Link from 'next/link';
 import AdminBreadcrumb from 'app/components/AdminBreadcrumb';
 import AdminPageHeader from 'app/components/AdminPageHeader';
 
+import { publishProduct, unpublishProduct } from '../actions/details-actions';
+
 type PageProps = {
   params: Promise<{ productId: string }>;
+  searchParams?: { status?: string };
 };
 
-export default async function ProductPage({ params }: PageProps) {
+export default async function ProductPage({ params, searchParams }: PageProps) {
   const { productId } = await params;
   const cookieStore = await cookies();
 
@@ -25,37 +30,48 @@ export default async function ProductPage({ params }: PageProps) {
     }
   );
 
-  const businessResult = await supabase
-    .from('business')
-    .select('id')
-    .limit(1);
-
-  if (!businessResult.data || businessResult.data.length === 0) {
-    throw new Error('Business não resolvido.');
-  }
-
-  const businessId = businessResult.data[0].id;
-
   const productResult = await supabase
     .from('products')
     .select('id, title, status')
     .eq('id', productId)
-    .eq('business_id', businessId)
-    .single();
+    .limit(1);
 
-  if (!productResult.data) {
+  if (!productResult.data || productResult.data.length === 0) {
     throw new Error('Produto não encontrado.');
   }
 
-  const product = productResult.data;
+  const product = productResult.data[0];
+
+  const feedback =
+    searchParams?.status === 'published'
+      ? 'Produto publicado.'
+      : searchParams?.status === 'unpublished'
+        ? 'Produto despublicado.'
+        : null;
+
+  async function handlePublish() {
+    'use server';
+    await publishProduct(product.id);
+  }
+
+  async function handleUnpublish() {
+    'use server';
+    await unpublishProduct(product.id);
+  }
 
   return (
     <div className="space-y-6">
       <AdminBreadcrumb />
 
+      {feedback && (
+        <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+          {feedback}
+        </div>
+      )}
+
       <AdminPageHeader
         title={product.title}
-        description={`Produto do Painel do Negócio • Status: ${product.status}`}
+        description={`Produto • Status: ${product.status}`}
         action={
           <Link
             href={`/products/${product.id}/edit`}
@@ -68,15 +84,25 @@ export default async function ProductPage({ params }: PageProps) {
 
       <section className="flex gap-3">
         {product.status === 'draft' && (
-          <button className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-800">
-            Publicar
-          </button>
+          <form action={handlePublish}>
+            <button
+              type="submit"
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-800 hover:bg-gray-50"
+            >
+              Publicar
+            </button>
+          </form>
         )}
 
         {product.status === 'published' && (
-          <button className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-800">
-            Arquivar
-          </button>
+          <form action={handleUnpublish}>
+            <button
+              type="submit"
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-800 hover:bg-gray-50"
+            >
+              Despublicar
+            </button>
+          </form>
         )}
       </section>
     </div>

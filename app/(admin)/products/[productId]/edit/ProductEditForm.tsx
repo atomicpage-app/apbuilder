@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { updateProductDraft } from './actions';
+import { updateProductDraft } from '../../actions/edit-actions';
 
 type ProductDraftEditableFields = {
   title: string;
